@@ -1,0 +1,4 @@
+1-DNS	BROWSER	     BJNP
+2-16:00:00,535067 h (HTTP OK) - 16:00:00,419198 h (HTTP GET)= 00:00:00,115869 h
+3-gaia = 128.119.245.12 && meu = 10.20.68.46 (não tenho o proxy ligado)
+4-anexado
