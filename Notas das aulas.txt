@@ -1608,4 +1608,583 @@ O output port transmite os pacotes, que estão em buffer, pelo link de saida. A 
 
 Neste exemplo assume-se que todas as linhas têm a mesma capacidade de transmissão, e que o switch opera a 3x a capacidade das linhas. Três pacotes foram transferidos para o buffer de output e aguardam transmissão. No instante seguinte um pacote foi transmitido e um outro pacote é colocado no buffer. Em caso de excesso o pacote é dropped. Existem várias politicas de drop (escolha do pacote a ser feito o drop).
 
+[Slide 4.19]
+
+Vamos ver:
+- Protocolos de routing (como é feita a actualização das tabelas e como são escolhidos os caminhos)
+- Existem duas versões do IP (versão 4 e 6). Faremos toda a discussão do IP com base no IPv4 (em Redes II falarão do IPv6).
+- Falaremos do protocolo ICMP que é usado para reportar erros e para entregar informações sobre a camada de rede.
+
+[Slide 4.20]
+
+Vamos analisar o formato do header IP:
+
+- Versão: versão do protocolo IP, para que o router possa interpretar correctamente o que se segue. O IPv6 tem um formato diferente do IPv4.
+
+- Header length: Para determinar onde começam os dados. Isto porque podem existir opções no header. Se não existem opções o tamanho é de 20 bytes.
+
+- TOS (Type of Service): Para classificar datagramas. A sua utilização ou não depende do fabricante. O tipo de serviço a fornecer aos datagramas depende da configuração feita pelo administrador da rede. Diferenciação de serviços em RedesII.
+
+- Datagram length: Tamanho do pacote (header+dados) em bytes. Limite teórico 2^16=65535. 
+
+Nota: o MTU (Maximum transmission unit) define o maior tamanho de pacote/frame que uma interface aceita (camada de ligação). Nas interfaces Ethernet MTU=1500 bytes. Os datagramas com tamanho superior (datagram length > MTU) terão que ser fragmentados. É conveniente que o MSS (maximum segment size) seja definido de forma a serem evitadas fragmentações. Desta forma o desempenho aumenta uma vez que é evitado trabalho associado à fragmentação/reassemblagem de datagramas. Também não é bom um MSS pequeno porque existe mais informação de controlo (headers) para a mesma quantidade de dados transportada.
+
+- Identifier, flags, fragment offset: Usado para fragmentação. Vamos ver a seguir.
+
+- TTL (Time To Live): Usado para garantir que os datagrams não circulam eternamente na rede devido a inconsistencias e loops nas tabelas de routing. Decrementa 1 valor sempre que passa por um router e é "dropped" quando chega a 0.
+
+- Protocol: Apenas é usado quando o datagrama chega ao destino. Especifica o protocolo de transporte a quem deve ser entregue os dados (6=TCP,17=UDP). Análogo ao port number no header do segmento TCP/UDP. É o que liga as camadas.
+
+- Header checksum: Para detecção de erros. São feitas somas de blocos de 16 bits (2 bytes) e acha-se o complemento a 1 tal como descrito no checksum do TCP/UDP. Note-se que ao contrário do TCP/UDP em que o checksum é feito sobre todo o segmento, aqui o cheksum é só sobre o header. 
+
+- Source and destination IP address: endereços IP origem e destino. 
+
+- Options: Existem várias. Fazem variar o tamanho do pacote e o tempo de processamento nos routers. Traz dificuldades e por isso foram retirados do IPv6.
+
+- Data: segmento TCP/UDP ou outros dados como mensagens ICMP. O campo "Protocol" identifica o que está nesta seção.
+
+[Slide 4.21]
+
+A imagem mostra 1 datagrama grande a entrar num router e 3 datagramas mais pequenos a sair desse mesmo router. Isto é um datagrama grande passa a 3 mais pequenos por causa da fragmentação.
+
+Na tarefa de reassemblagem no host destino são usados os campos: Identifier, flags, fragment offset.
+
+O IP numera os datagramas com um identificador (campo "identifier"), que vai sendo incrementado. Quando existe fragmentação, cada fragmento tem o identificador do datagram original, permitindo assim  que o destino faça a reassemblagem. Note-se que fragmentos são tanbém datagramas. 
+
+As flags são três: 1 bit não é usado (reserved), bit DF (Don't Fragment), bit MF (More Fragments). Os primeiros fragmentos têm a MF=1, enquanto que o último fragmento tem MF=0. Para forçar que não haja fragmentação coloca-se DF=1 (o ICMP pode, no entanto, reportar um erro caso o tamanho do datagrama seja superior ao MTU num determinado ponto da rede). O fragment offset permite que o destino junte os pedaços pela ordem correcta. Isto é, especificam onde fica o fragmento dentro do datagram original.
+
+[Slide 4.22]
+
+Exemplo: Datagrama de 4000 bytes (20 bytes header IP + payload) e MTU de 1500. Payload de um datagrama pode ser no máximo 1480, dado que MTU=1500. Logo, no primeiro datagrama offset=0, no segundo datagrama offset=1480/8, no terceiro datagrama offset=(1480x2)/8. Como cada datagrama terá que ter um header IP, os tamanhos dos datagramas serão 1500 (20 bytes de header + 1480 de payload), 1500 (20 bytes de header + 1480 de payload) e 1040 (20 bytes de header + 1020 de payload). Isto é, a soma dos payloads (1480+1480+1020 dá 3980 que era o payload do datagrama original).
+
+[Slide 4.24]
+
+Endereço IP está associado a uma interface. Logo, um router pode ter vários IPs. 
+- Um IP de 32 bits está separado em 4 grupos de 8 bits,  cada grupo representado por um número decimal.
+- Cada interface em cada host/router (para um host com uma interface podemos pensar na máquina em si) tem de ter um IP único. Isto (refiro-me a ser único em toda a Internet) apenas não acontece para IPs por detrás de serviços NAT (irão ver em RedesII). 
+
+[Slide 4.26]
+
+Os IPs não podem ser usados de qualquer maneira. Cada endereço IP tem uma parte que se refere à subrede (ou rede) e outra parte que se refere ao host. O endereço IP de um host em particular terá a parte de subrede pré-determinda: igual à subrede a que está ligado o host.
+
+No exemplo temos as subredes: 223.1.1.0, 223.1.2.0, 223.1.3.0. 
+
+Uma subrede inclui um conjunto de hosts que têm a parte de subrede no endereço IP igual. Os hosts numa subrede estão interligados “directamente” (via hub ou switch) sem nenhum router pelo meio.
+
+[Slide 4.27]
+
+O endereço de uma subrede termina com 0s na parte de hosts. É usada a notação 223.1.3.0/24 onde /24 é chamada a máscara de subrede. A máscara indica quantos bits, a contar da esquerda, pertencem à subrede. Também poderia ser usada a máscara 255.255.255.0 (se visualizarmos este número em binário temos 11111111.11111111.11111111.0; as posições onde estão 1s referem a parte de subrede; uma operação de AND entre um número IP e máscara permite separa a parte de subrede da parte de host).
+
+[Slide 4.28]
+
+Quantas subredes? Temos 6 (mascara /24)
+
+Neste caso, o número de IPs que se pode atribuir a hosts é 2^8-2: i) não se deve atribuir a combinação de bits com 0s na parte de host (ex: 223.1.3.0/24) a uma interface, já que se refere à subrede; ii) a combinação de bits com tudo 1s na parte de host (ex: 223.1.3.255/24) também não, uma vez que se refere a um broadcast nesta subrede. O RFC 3021 especifica uma excepção para esta regra: quando apenas dois "end points" estão ligados (isto é, apenas é necessário 1-bit para identificar hosts/interfaces). Nestas situações, normalmente links ponto-a-ponto, apenas dois "end points" estão ligados e a especificação de endereço de subrede de broadcast não é necessária.
+
+Exemplo de uso da mascara (atribuicao de um ip address a uma interface, CISCO): 
+ip address 192.168.12.2 255.255.255.0
+ou entao:
+ip address 192.168.12.2/24
+
+Exemplo de tabela de routing (para exemplo do slide 28; router no topo):
+Network Destination Netmask          Gateway   Interface Metric
+223.1.1.0           255.255.255.0              eth0      1
+223.1.2.0           255.255.255.0    223.1.9.1 eth1      2
+223.1.3.0           255.255.255.0    223.1.7.1 eth2      2
+223.1.7.1           255.255.255.255            eth2      1
+223.1.9.1           255.255.255.255            eth1      1
+
+nota: podem ter uma entrada default com 0.0.0.0 e 0.0.0.0 na network destination e mascara, para enviar qq trafego para o exterior (ip de destino desconhecido). 
+
+[Slide 4.29]
+
+Antes de ser adoptada a estratégia de endereçamento CIDR, a parte de rede tinha de ter 8, 16 ou 24 bits (redes de classe A, B e C respectivamente). Esta estrategia é chamada “classful addressing”. Isto era pouco flexível e trazia problemas: endereços de classe B ficaram esgotados, muitos endereços de host ficavam desperdiçados (ex: empresa com 2000 hosts tinha um endereço de classe B que lhe permitia ter 65534 números de hosts). 
+
+Actualmente a estratégia de endereçamento usada (CIDR) tem um tamanho arbitrário na parte de subrede, mas um endereço tem de ser fornecido com o formato a.b.c.d/x, onde x é a máscara de subrede (subnet mask).
+
+Tipicamente uma empresa recebe um bloco contiguo de endereços IP (mas não é obrigatório) e, por isso, hosts nesta empresa irão ter um prefixo comum. Isto permite que routers, fora da empresa, tenham tabelas pequenas já que basta uma entrada a.b.c.d/x para encaminhar todos os datagramas destinados a essa empresa. Os restantes bits servirão para distinguir hosts já na empresa. Destes restantes bits para atribuir a hosts, parte pode ainda servir para dividir a rede da empresa em partes: subnetting. Exemplo: a.b.c.d/21 poderá ser o endereço CIDR da empresa, e comum a todos os hosts, e internamente a empresa pode utilizar a.b.c.d/24 para se referir a uma subrede dentro da organização (3 bits para subredes). 
+
+Endereços especiais: 255.255.255.255 broadcast para todas as máquinas (até ao router dado que os routers não propagam broadcasts). Pode também usar-se o endereço de rede/subrede específico com parte de hosts a 1s (binario).
+
+[Slide 4.30]
+
+Como é obtido um IP?
+- Configurado no software, de forma fixa
+- Via DHCP. Um cliente envia um broadcast a perguntar se existem servidores DHCP a "escutar". O servidor de DHCP apanha esse pedido e responde com uma oferta de IP. Se o cliente aceitar, para além do IP são enviadas outras informações adicionais (RedesII).
+
+[Slide 4.31]
+
+Neste caso o ISP está a usar 3 bits para subnetting, que dá para fazer 2^3=8 subredes. O IETF inicialmente desaconselhava o uso da primeira (all zeros) e última (all ones) subrede, quando é feito subnetting. Em 1995 isto tornou-se obsoleto.
+
+[Slide 4.32]
+
+Isto significa que um router na Internet irá ter nas suas tabelas de routing a informação: se chegarem pacotes cuja parte esquerda do endereço IP destino coincide com 200.23.16.0/20, então devem ser enviado para o router do "Fly-By-Night-ISP".
+
+[Slide 4.33]
+
+Se a organização 1 mudar de localização, o router na Internet irá ter nas suas tabelas de routing uma informação mais especifica (para além da mencionada anteriormente): se chegarem pacotes cuja parte esquerda do endereço IP destino coincide com 200.23.18.0/23, então deve ser enviado para o router do "ISPs-R-Us". Como esta entrada é mais específica que a entrada 200.23.16.0/20 o router não vai fazer confusão. Exemplos:
+
+Pacote com IP destino 200.23.19.0 (11001000.00010111.00010011.00000000)->encaminhado para 200.23.18.0/23  (11001000.00010111.00010010.00000000)
+Pacote com IP destino 200.23.17.0 (11001000.00010111.00010001.00000000)->encaminhado para 200.23.16.0/20  (11001000.00010111.00010000.00000000)
+Pacote com IP destino 200.23.21.0 (11001000.00010111.00010101.00000000)->encaminhado para 200.23.16.0/20  (11001000.00010111.00010000.00000000)
+
+Todos estes endereços IP destino são números válidos para host (isto é, combinação de bits reservada para hosts, bits [24-32], não é tudo 0s ou tudo 1s).
+
+Nota: vejam exemplo de subnetting disponibilizado na tutoria
+
+Nota: alguns slides foram suprimidos porque DHCP e NAT ficará para RedesII.
+
+[Slide 4.35]
+
+O forwarding tradicionalmente baseia-se no endereço IP de destino. No entanto, surgiram soluções para:
+- Reescrever o endereço IP e número de porto, que é o caso do NAT.
+- Bloquear trafego com base em campos dos headers, caso das firewalls
+- Redirecionar pacotes para processamento adicional, caso do DPI (deep packet inspection) em que os dados são também examinados (deteção de vírus, etc) e pacotes filtrados em conformidade.
+- Balancear carga, onde vários servidores fornecem um serviço (ex: HTTP).
+
+Surgiram fornecedores com diferentes soluções de hardware e software, cada um com as suas interfaces para gestão/configuração. Confusão! O paradigma SDN veio trazer uma abordagem unificada para muitas das funções mencionadas. O objetivo é haver interfaces abertas que permitam o desenvolvimento de software que possa controlar os dispositivos de rede, fluxo do trafego, inspeção/tratamento de pacotes. A open networking foundation define toda a arquitetura SDN.
+
+[Slide 4.36]
+
+OpenFlow é um standard que permite escrever nas “flow table” dos switches e routers. Permite que equipamento de diferentes fabricantes, com interfaces proprietário, sejam geridos remotamente de forma igual (um único protocol aberto). É um facilitador/capacitador do SDN. A comunicação ocorre através de canais SSL/TLS. Muitos fabricantes têm equipamento que suporte o OpenFlow e o software nativo do fabricante (são dedicados portos diferentes). O OpenFlow é um protocolo para comunicação entre controlador e dispositivos.
+
+O forwarding tradicional baseia-se no “match” do endereço IP de destino e numa “action” que é colocar o pacote numa porta de saída específica. O openflow consiste num paradigma match+action mais genérico. O match pode ser feito com base em vários campos nos headers de várias camadas, e as actions podem ser várias.
+
+Nota: estão disponíveis library files do OpenFlow (podem contruir as vossas aplicações para controlar dispositivos) e simuladores.
+
+[Slide 4.37]
+
+Cada entrada na tabela de forwarding pode ter:
+- Conjunto de campos de headers, para o match.
+- Ações, caso exista match (ex: enviar para 1 mais ports, fazer o drop, alterar campos do header, …). Se não o pacote não coincide com nenhuma entrada, pode ser dropped ou enviado para o controlador para processamento adicional (ex: avaliar possível adição de entrada).
+- Contadores (ex: numero de pacotes em que ocorreu match, ultima vez que a entrada na tabela foi atualizada, …)
+- Prioridades para os padroes de match, caso haja sobreposição.
+
+[Slide 4.38]
+
+Exemplos: o forward(2) significa forward para a port #2.
+
+[Slide 4.39]
+
+Nao vamos entrar em detalhe pois nao falamos de alguns campos. Basicamente o “switch port” é o ID da porta física de entrada (por onde chegou o pacote). Os restantes são campos de 3 camadas protocolares.
+
+[Slide 4.40-4.41]
+
+Nota: para balanceamento de carga (load balancing) haverá mais que uma entrada na tabela que os forwards são diferentes (porto mencionado em action) mas com match eventualmente iguais (ou apenas com switch port diferentes).
+
+[Slide 4.42]
+
+No caso do NAT a action inclui o novo endereço IP e porta.
+
+[Slide 5.4]
+
+Per-router control: cada router faz as suas tarefas associada ao plano de controlo.
+Sdn: o controlador faz as tarefas associadas ao plano de controlo dos vários switches no seu domínio. 
+
+Nota: poderiam existir vários controladores, mas cada um tem o seu domínio (conjunto de switches)
+
+[Slide 5.8]
+
+Os hosts estão ligados a um router local e basicamente é necessário que as tabelas tenham informação sobre qual o caminho (de preferencia o melhor) entre o router local na origem e o router local no destino. Assim sendo, são necessários algoritmos para encontrar estes caminhos.
+
+[Slide 5.9]
+
+A teoria de grafos pode ser usada para formular problemas de encaminhamento. Um grafo é composto de um conjunto de nós e um conjunto de ligações.
+
+[Slide 5.10]
+
+Um link tem normalmente um custo (peso) associado. O custo de um caminho é a soma dos custos dos links percorridos. O problema normalmente é encontrar, neste grafo, o caminho de menor custo. Esse será o melhor caminho, num determinado contexto. Isto é:
+- Se custo é 1 em todos os links, o problema resume-se ao caminho com menos saltos (hops)
+- Se custo está relacionado com a largura de banda de forma inversa: baixo custo significa que o link tem muita largura de banda disponível e por isso deve ser preferido.
+- Se custo está relacionado com o congestionamento de forma directa: baixo custo significa que o link tem pouco congestionamento e por isso deve ser preferido (atenção: nos slides em ingles existe um erro, é dito inversamente proporcional para um custo associado a congestionamento).
+
+[Slide 5.11]
+
+Os algoritmos de routing podem possuir informação global de toda a rede, ou esta informação pode estar descentralizados. Os algoritmos podem também ser estáticos ou dinâmicos.
+
+nome "Link-state" - porque o algoritmo tem de conhecer todos os links e seus custos.
+nome "Distance vector" - porque o algoritmo contém um vector de custos estimados para todos os outros nós na rede.
+
+Vamos analisá-los adiante.
+
+[Slide 5.17]
+
+Deste algoritmo de Dijkstra acaba por resultar uma árvore com raiz no nó fonte. Isto porque cada nó tem o nó anterior do seu caminho mais curto até à fonte. Na tabela de forwarding apenas é colocado o próximo salto.
+
+[Slide 5.18]
+
+Nota: na expressão n(n+1)/2, n=((número de nós no grafo) - 1).
+
+Podem ocorrer oscilações. Exemplo:
+- Nó D tem 1 unidade de tráfego para enviar para o nó A, Nó C tem e unidades de tráfego para enviar para o nó A, e o nó B tem 1 unidade de tráfego para enviar para o nó A.
+- Os custos representam a carga de tráfego que os links transportam, e queremos achar o caminho de menor atraso.
+- Na execução seguinte do algoritmo LS o caminho no sentido dos ponteiros do relógio é detectado e as tabelas reconfiguradas.
+- Na execução seguinte do algoritmo LS o caminho contrário aos ponteiros do relógio é detectado e as tabelas reconfiguradas.
+- etc.
+
+P: Como evitar oscilações?
+R: Evitar que os routers corram o algoritmo LS ao mesmo tempo. Randomize do próximo instante em que o router irá enviar um "link advertisement" ao outros routers (LSAs,link state advertisments, são mensagens para propagação de informação associada ao link para cálculo do melhor caminho). 
+
+[Slide 5.20]
+
+Comecemos por ver uma relação interessante que existe nos custos dos caminhos mais curtos (ou seja, esta relação existe apenas para os caminhos mais curtos). A relação é a seguinte: a distância x -> y será igual ao menor valor encontrado para c(x,v)+distância v -> y, de entre os vários nós v vizinhos de x.
+
+[Slide 5.21]
+
+A primeira linha refere-se aos vizinhos de u: v, x, w. O exemplo diz que o custo do caminho mais barato de u para z é a menor das somas do custo de um link vizinho com a distancia do vizinho a z. O nó vizinho com o menor destes valores é o próximo salto, informação essa que fica na tabela de forwarding.
+
+[Slide 5.22]
+
+Com base no que foi dito vamos ver como funciona o algoritmo DV:
+- Dx(y). Cada nó começa com um valor estimado da distancia até a um nó y, para todo o y.
+- O nó x sabe os custos para cada vizinho v: c(x,v)
+- O nó x mantém os vectores distancia dos seus vizinhos
+
+[Slide 5.23]
+
+É assíncrono porque os nós não necessitam de executar o algoritmo em simultâneo.
+
+[Slide 5.27]
+
+1º Dy(x)=min{c(y,x)+Dx(x), c(y,z)+Dz(x)}=min{1+0,1+5}=1, informa os vizinhos
+2º Vizinho z, ao receber faz: Dz(x)=min{c(z,x)+Dx(x), c(z,y)+Dy(x)}=min{50+0,1+1}=2, informa os vizinhos
+3º y, ao receber faz: Dy(x)=min{c(y,x)+Dx(x),c(y,z)+Dz(x)}=min{1+0,1+2}=1, não mudou, não informa vizinhos.
+
+[Slide 5.28]
+
+1º Dy(x)=min{c(y,x)+Dx(x), c(y,z)+Dz(x)}=min{60+0,1+5}=6, informa os vizinhos. Neste momento já podemos ver que o custo via z está errado, uma vez que este não consegue ir para x com custo 5. Temos um loop.
+2º  Como o nó y tem um novo custo, vai informar os vizinhos
+3º O nó z vai calcular Dz(x)=min{50+0,1+6}=7, e informa os vizinhos porque o seu custo alterou-se,
+4º ... Isto continua 44 iterações!
+
+Isto pode ser evitado com uma técnica chamada "poisoned reverse". Será que resolve o problema dos loops? Não porque podem existir loops que envolvem mais que dois nós adjacentes. Isto não será detectado por esta técnica. 
+
+[Slide 5.29]
+
+LS:
+- Um nó necessita de conhecer os custos de todos os links. Isto significa que são necessárias O(nE) mensagens. Sempre que existe uma alteração de um custo essa alteração tem de ser enviada a todos os nós, via broadcast.
+- Velocidade de convergência, O(n^2), previsível.
+- Se houver sabotagem, o problema não é muito grave porque um host está a calcular apenas as suas tabelas, e não as vai difundir. Calcula as suas tabelas com um erro.
+- Exemplo de protocolo que usa LS: OSPF
+DV:
+- Mensagens trocadas apenas entre vizinhos. O número de mensagens necessárias depende da convergencia do algoritmo, que varia.
+- Velocidade de convergência imprevisível. Pode ser lenta e ter loops.
+- Se houver sabotagem, o problema é mais grave porque o host está a calcular tabelas que as vair difundir e os outros nós vão assentar os seus cálculos nessas tabelas erradas.
+- Exemplo de protocolo que usa DV: RIP
+
+Ambos os algoritmos têm vantagens e desvantagens e ambos são usados na Internet.
+
+[EXEMPLO RIP]
+Para ativar o RIP num router Cisco:
+1. enable
+2. configure terminal
+3. router rip
+4. network <net ip-address>
+fariam este comando para cada endereço de rede (lado de lá de cada interface) que querem anunciar via RIP. Para mudar a periodicidade dos advertisements pode usar-se o comando 'timers basic <update>'.
+
+[Slide 5.31]
+
+Vimos a rede como um conjunto de nós, todos a executar o mesmo algoritmo de routing. À partida poderiam pertencer a uma mesma administração de rede. Mas esta não é a situação real, porque: 
+- À medida que o número de routers começa a crescer, torna-se impossível ou inviável armazenar nas tabelas de routing todos os routers destino e actualizar informações acerca de todos (imagine-se se fosse via broadcast...).
+- As organizações deverão ter a possibilidade de controlar o modo de funcionamento dos seus routers. 
+
+
+[Slide 5.32]
+
+Os problemas do slide anterior podem ser resolvidos se os routers estiverem organizados em ASs (Autonomous Systems), em que os routers de um AS estão sob o mesmo controlo administrativo (mesmo ISP, ou empresa). Os routers num AS correm todos o mesmo protocolo de routing.
+
+Intra-AS Routing Protocol: Protocolo de routing que corre dentro de um AS. ASs podem correr protocolos intra-AS diferentes.
+
+Gateway: Router de um AS que faz a ligação com outros ASs, isto é, para fora do seu AS.
+
+[Slide 5.33]
+
+Este é um exemplo com 3 ASs. Nesta figura as linhas mais grossas correspondem a ligações entre routers e as linhas mais finas correspondem a ligações a subredes.
+
+Gateways: 1b, 1c, 2a, 3a. 
+
+O que foi dito até agora descreve como o routing acontece num AS. Como é feito o routing entre ASs? Se o AS tem apenas um gateway router que o liga a outro AS, torna-se fácil porque o protocolo de routing intra-AS do AS já determinou o melhor caminho de cada router até à gateway.  Cada router sabe então como enviar à gateway pacotes que são dirigidos para fora. O gateway router apenas direcciona para o link de saida. O router no outro extremo pega no pacote e encaminha-o dentro do seu AS, etc.
+
+Se o AS tem mais que um gateway, o caso é mais complicado.(caso descrito no próximo slide).
+
+[Slide 5.34]
+
+Se, no exemplo, um router de AS1 recebe um pacote que é dirigido para fora desse AS, então o router tem de saber se envia para a gateway 1c ou para a a gateway 1b. Neste caso é necessário:
+- que AS1 saiba que destinos ficarão acessíveis via AS2 e via AS3
+- que esta informação seja configurada nas tabelas de forwarding, de forma a que destinos externos estejam acessíveis.
+Estas tarefas são realizadas pelos Inter-AS Routing Protocols. Os ASs em comunicação têm de usar o mesmo Inter-AS routing protocol. Na Internet, é usado o BGP. Os routers terão assim entradas nas suas tabelas tanto do Intra como do Inter AS routing protocol.
+
+[Slide 5.35]
+
+Um protocolo de routing intra-AS, também chamado interior gateway protocols (IGPs), determina como é feito o routing num AS. Os mais conhecidos são: RIP, OSPF, IGRP. Em GRS irão ver como configurar estes protocolos. 
+
+[Slide 5.36]
+
+O protocolo de routing inter-domain que é mundialmente utilizado é o BGP. Configuração e detalhes fica para GRS.
+
+
+[Slide 5.38]
+
+O ICMP é considerado como parte do IP mas está acima do IP uma vez que as mensagens ICMP são transportadas dentro de datagramas, tal como segmento TCP ou UDP.
+
+[Slide 5.38]
+
+O ICMP é considerado como parte do IP mas está acima do IP uma vez que as mensagens ICMP são transportadas dentro de datagramas, tal como segmento TCP ou UDP.
+
+Formato de um pacote ICMP: type (8 bits), code (8 bits), checksum (16 bits), data (variavel, depende de type e code)
+
+[Slide 5.39]
+
+O programa Traceroute que introduzimos no capítulo 1, e que é usado para fazer o trace do caminho de um host até outro host noutro ponto do mundo, é implementado com mensagens ICMP.
+
+O n-ésimo router despreza os datagramas gerados na origem com TTL=n (TTL é decrementado em cada router; quando o n-ésimo router decrementa o TTL este fica igual a 0), e faz o report de um erro (TTL expired) usando o ICMP. A source consegue assim calcular o RTT. Quando um datagrama chega ao destino este gera um destination port unreachable (type=3,code=3). Ao receber esta mensagem a origem para o envio de datagramas.
+
+﻿[Slide 6.2]
+
+Até agora vimos como é feita a comunicação entre processos, e hosts, que atravessam vários links. Como é feita a transmissão num único link? Vamos ver.
+
+[Slide 6.5]
+
+Um datagrama pode atravessar links diferentes e para cada um deles necessita de usar um protocolo especifico. O protocolo da camada link layer define o formato dos pacotes trocados entre os nós nos extremos de um link. Os pacotes são chamados frames. Podem existir protocolos diferentes para um mesmo tipo de link. 
+
+Na analogia: Limo = limousine, JFK=aeroporto nos EUA
+
+[Slide 6.6]
+
+Um protocolo da camada de ligação de dados pode fornecer diferentes serviços:
+- Framing: Todos os protocolos colocam um datagrama dentro de uma frame antes de os dados serem transmitidos. Isto significa colocar um header e nalguns casos um trailer (ambos são chamados "header fields"). O formato dos "header fields" varia conforme o protocolo. 
+- Acesso ao meio: Poderá existir um protocolo MAC que impõe as regras de acesso ao meio partilhado. No caso de um meio não partilhado (ligação ponto-a-ponto) não existe a necessidade de um protocolo MAC. O endereço MAC (Endereço físico) é usado no header da frame para identificar a fonte e o destino num meio partilhado.
+- Entrega fiável: pode ser feita para links de elevada taxa de erros (ex:wireless). Os links de fio muitas vezes não têm este serviço. Funciona também com acks e retransmissões tal como visto na camada de transporte. O erro é corrigido localmente, onde o erro ocorre (maior rapidez dado que evita retransmissão end-to-end).
+
+[Slide 6.7]
+
+Os receptores fazem buffering limitado de frames. Tal como no TCP o flow control evita que o emissor congestione o receptor.
+
+O receptor pode detectar erros nos bits e solicitar ao emissor a retransmissão. A correção de erros (apenas no header) é também possível.
+
+Nota: Embora alguns serviços possam ser semelhantes aos da camada de transporte, na camada de ligação de dados esse serviço é disponibilizado entre os extremos do link e não entre processos (end-to-end)
+
+[Slide 6.8]
+
+A camada de ligação é implementada numa placa de rede, também conhecida como NIC (Network Interface Adaptor).
+
+O adaptador é semi-autonomo no sentido que pode desprezar uma frame com erros sem que outros componentes saibam. Quando tem dados gera uma interrupção para avisar o host/router.
+
+[Slide 6.11]
+
+Vamos ver algumas técnicas que são adoptadas, pela camada de ligação, para correção e deteção de erros. Em termos gerais:
+- Na origem são colocados alguns bits para deteção de erros (EDC) para além dos dados (D). 
+- No destino são recebidos D’ e EDC’ que podem ser diferentes de D e EDC devido a erros. O desafio é detectar se existem erros.
+
+Vamos ver 3 métodos para deteção de erros:
+- Paridade: simples e bom para ilustrar a deteção de erros
+- Checksumming: tipicamente usados nas camadas de transporte, como já vimos
+- CRC (cyclic redundancy checks): mais usados pelas placas de rede.
+
+[Slide 6.12]
+
+Verificação de paridade:
+- Se usada paridade par, o bit extra deverá ser tal que o numero total de bits a 1 é par.
+- Se usada paridade impar, o bit extra deverá ser tal que o numero total de bits a 1 é impar.
+
+No exemplo de 2 dimensões dá para corrigir o bit que sofreu erro (cruzamento das duas linhas).
+Desvantagem: fornecem pouca proteção se houver troca de mais que um bit.
+
+[Slide 6.13]
+
+Checksum: Os bits dos dados são tratados como sequencias de k bits. Um método é somar as várias sequencias de k bits e usar o complemento a 1 desta soma como informação de checksum. Isto é, todas as words de 16 bits do segmento são adicionadas. Se existe overflow, o bit que sobra entra no outro lado. É feito o complemento a 1 do resultado (0s passam a 1s; 1s passam a 0s).
+
+
+Vantagem: colocam pouco overhead no seu cálculo.
+Desvantagem: fornecem pouca proteção contra erros. 
+
+Porque é usado pela camada de transporte? Porque a camada de transporte é implementada em software e necessita, por isso, de cálculos simples e rápidos. O metodo CRC, descrito adiante, é usado nas placas porque fica implementado em hardware. Pode ser mais complexo porque a execução em hardware é mais rápida.
+
+[Slide 6.14]
+
+- Os dados a serem enviados, D, são vistos como uma sequencia de d bits.
+- O emissor e receptor usam um mesmo padrão de r+1 bits, chamado gerador G. O bit mais significativo tem de ser 1.
+- O emissor irá acrescentar aos seus dados D um conjunto de r bits, chamado R, de forma que os d+r bits sejam divisíveis (resto 0) por G usando aritmética módulo 2.
+- O receptor divide os d+r bits recebidos por G. Se resto 0 então não houve erro.
+- Como multiplicar por 2^r equivale a fazer um shift, os d+r bits juntos serão o resultado da operação: 
+		D*2^r XOR R
+Isto é, existe um shift e depois os bits à direita são activados com R.
+- Se o CRC utiliza r+1 bits no gerador, então consegue detectar 100\% dos erros que envolvam até r bits consecutivos (inclusive), e uma fração de erros mais longos. Quanto mais longo o CRC, menor a fração de erros que passam sem serem detectados.
+
+[Slide 6.15]
+
+- Queremos então que D*2^r XOR R seja divisível por G. Assim terá que ser igual a nG. Se fizermos o XOR R em ambos os lados temos: D*2^r = nG XOR R. Esta expressão diz-nos que, se usarmos aritmética módulo 2, D*2^r é igual a um múltiplo de G mais R. Logo, R será o que sobra caso se divida  D*2^r por G. 
+
+- A aritmética módulo 2 é uma forma de aritmética binária onde a soma e subtração não propagam dígitos para a próxima casa. Desta forma, a operação XOR equivale à soma e subtração. Exemplo:
+
+1011 XOR 0101 = 1110
+1011+0101=1110
+1011-0101=1110
+
+Daí usar-se operações de XOR durante o "algoritmo" da divisão. Isto é, vamos fazer sucessivas operações de XOR. No exemplo os bits transmitidos são D+R.
+
+[Slide 6.17]
+
+Temos basicamente dois tipos de links:
+- point-to-point: liga um emissor a um receptor. Exemplo de um protocolo: PPP (são usadas linhas telefónicas; o PC usa um modem ligado à linha telefónica para ligação a um modem no ISP).
+- broadcast: múltiplos emissores e múltiplos receptores ligados a um canal partilhado. Exemplo de protocolo: Ethernet, wireless LANs, tecnologia usada na televisão por cabo.
+
+[Slide 6.18]
+
+Nos protocolos MAC (Medium Access Control) a troca eventual de informação, que é necessária para determinar como o canal é partilhado, é feita através do canal de dados (in-band)
+
+[Slide 6.19]
+
+Como seria o protocolo MAC ideal? Para um canal com capacidade de transmissão de R bps:
+- 1 nó transmite a R bps
+- N nós transmitem a R/N bps
+- Simples e sem necessidade de qualquer coordenação (clock = sinal usado para sincronização)
+
+[Slide 6.23]
+
+Os protocolos anteriores têm a vantagem de evitar colisões e dividir a largura de banda de forma justa; têm a desvantagem de o nó estar limitado a R/N de largura de banda mesmo quando são os únicos a transmitir (o TDM tem ainda a desvantagem de o nó ter de aguardar a sua vez).
+
+Ethernet: Quando os hosts estão ligados a um hub que faz broadcast, este funciona como um protocolo do tipo CSMA/CD.
+
+[Slide 6.24]
+
+Vamos analisar um protocolo muito simples: Slotted ALOHA.
+
+Se assumirmos que p é uma probabilidade entre 0 e 1:
+- Quando um nó tem uma frame “fresquinha” para transmitir, transmite no próximo slot.
+- Se existe colisão o nó retransmite a frame, em cada slot seguinte, com probabilidade p até conseguir enviar a frame. Note-se que uma colisão é detectada antes de terminar o slot que está a ser usado, isto porque as estações só começam a transmitir no inicio de um slot e não algures a meio.
+
+[Slide 6.25]
+
+Desvantagens:
+- Caso exista colisão o slot é desperdiçado.
+- Como a retransmissão é feita com probabilidade p, podem existir slots "idle" embora existam frames para enviar. 
+- A deteção de colisão poderá ser feita muito antes de completar o slot de transmissão de um pacote e essa possibilidade não é usada para aproveitar melhor a largura de banda. Só no fim do slot, inicio do próximo slot, é que ocorre nova transmissão.
+
+[Slide 6.26]
+
+Não fizemos a análise da eficiencia por falta de tempo. Saber apenas que Slotted Aloha tem o dobro da eficiencia do Aloha puro.
+
+[Slide 6.27]
+
+No ALOHA sem slots uma frame pode ser transmitida imediatamente.
+
+[Slide 6.28]
+
+Não fizemos a análise da eficiencia por falta de tempo. Saber apenas que Slotted Aloha tem o dobro da eficiencia do Aloha puro.
+
+[Slide 6.29]
+
+Nos protocolos ALOHA a decisão de enviar uma frame é independente da actividade dos outros nós. No CSMA a acção dos outros nós é tomada em consideração. 
+
+[Slide 6.30]
+
+A figura mostra um diagrama em que 4 estações estão ligadas a um "bus" (exemplo: "bus" de cabo coaxial). No instante t0 a estação B detecta o canal livre e começa a transmitir. Os bits são propagados em ambas as direções. No instante t1 a estação D detecta o canal livre, uma vez que os bits ainda não chegaram a D, e começa também a transmitir.
+
+Quanto mais longa a distancia e atraso de propagação maior a probabilidade de colisões. Neste caso, como as estações não detectam colisões, continuam a transmitir. Quando as estações têm capacidade de detectar colisões, param assim que a colisão é detectada.
+
+[Slide 6.31]
+
+CSMA/CD: CSMA com deteção de colisões.
+
+Porque as wireless LANs não usam CSMA/CD? A capacidade de deteção de colisões exige que a estação consiga enviar e receber ao mesmo tempo. Como a força do sinal recebido é muito fraco (dado o meio de transmissão) quando comparado com o sinal enviado, torna-se muito caro conceber hardware que detecte colisões. Outra razão é o chamado "hidden terminal problem" que irão ver em Redes II.
+
+[Slide 6.32]
+
+Este é o diagrama espacial quando as estações têm a capacidade de detectar colisões. Reduz o desperdício.
+
+[Slide 6.33]
+
+Jam signal: 48 bits que correspondem a frame mal formada para que todos detectem. 
+
+Note-se que um "bit time" (duração de bit) varia de Ethernet-10 Mbps, para Ethernet-100 Mbps, etc. O tempo de transmissão é menor, respectivamente.
+
+m no máximo é 10.
+
+[Slide 6.34]
+
+Eficiência: fração de tempo em que está a haver transmissão produtiva (sem colisões) quando o numero de estações é grande e tem muitas frames para enviar.
+
+Quando o tempo de transmissão da frame aumenta a eficiência aumenta porque a transmissão está a ser muito produtiva e assim todas as outras estações não transmitem porque estão a escutar o meio. Se o tempo de propagação é 0 as estações detectam a colisão instantaneamente e param, não desperdiçando o canal.
+
+[Slide 6.35]
+
+TDM e FDM: ineficiente para baixas taxas mas eficiente e justo se todos estão a transmitir.
+CSMA: eficiente para baixas taxas; muitas colisões (ineficiente) para taxas altas.
+Taking turns: o melhor dos dois.
+
+[Slide 6.36]
+
+Existem dois tipos de abordagem "taking turns": polling e token passing.
+
+Exemplo de polling: Bluetooth.
+Exemplo de token passing: FDDI.
+
+[Slide 6.38]
+
+Vamos analisar uma rede de acesso por cabo que incorpora as várias abordagens discutidas anteriormente. Vários modems nas residencias ligam-se a um CMTS no headend da rede. Tanto no downstream como no upstream é usado FDM para divisão do segmento em múltiplos canais de frequencias diferentes. 
+
+[Slide 6.39]
+
+DOCSIS é uma especificação para redes de acesso por cabo:
+
+- FDM, para divisão em múltiplos canais, é usado no downstream (throughput de 40Mbps cada canal) e upstream (throughput de 30 Mbps cada canal). Todos são canais de broadcast. 
+
+- No downstream não existe problema de acesso múltiplo aos canais, enquanto no upstream multiplos modems podem querer aceder ao meio. Logo, cada canal de upstream é dividido no tempo (TDM). Terão mini slots em que cada modem pode lá colocar dados. O CMTS é quem dá permissão aos modems nas residencias para usarem esses slots (envia mensagens de controlo, MAP messages, por um canal de downstream). Isto é, um ou mais mini-slots são explicitamente atribuidos aos modems, evitando colisoes.
+
+- Como é que o CMTS sabe que modems necessitam de enviar dados? Os modems colocam os seus pedidos nuns mini-slots especiais para esse efeito. O acesso a estes mini-slots reservados, para especificar necessidades de largura de banda, é aleatório podendo haver colisões. Como não há detecção de colisões, um modem conclui que o seu pedido não teve sucesso caso não receba resposta do CMTS com a indicação de slots para ele transmitir.
+
+
+[Slide 6.41]
+
+Vimos até agora que servições são fornecidos pela camada de ligação, deteção/correção de erros, protocolos de acesso múltiplo. Vamos agora ver vários questoes das tecnologias LAN: endereçamento, protocolo Ethernet, hubs/switches/routers.
+
+[Slide 6.45]
+
+Uma tabela de routing tem linhas do tipo: <destination, mascara, gateway, inteface>. 
+Ex: 192.168.3.0     255.255.255.0     192.168.3.3     eth0
+Para enviar para a gateway é necessário então descobrir qual o endereço MAC associado a esse IP. Para esse efeito é usado o protocolo ARP.
+
+[Slide 6.46]
+
+O S.O. de cada máquina faz a gestão destas tabelas, contrariamente às tabelas de routing que são geridas pelo administrador.
+
+[Slide 6.54]
+
+Ethernet é simples e conseguiu lançar versões que acompanharam as velocidades das outras tecnologias. Este facto e a compatibilidade fez com que continuasse a ter sucesso.
+
+[Slide 6.58]
+
+Ethernet: é "unreliable" e "connectionless".
+Quando o meio é partilhado o Ethernet usa CSMA/CD.
+
+[Slide 6.61]
+
+Se uma placa não está a funcionar bem e envia constantemente frames, o switch detecta e desliga a ligação à placa.
+
+Não é possível com um hub ligar Ethernets de velocidades diferentes porque o Hub não faz buffering da frame para posterior transmissão da frame com outra codificação e maior numero de transições de bits. Apenas dá maior força ao sinal. Um switch já permite que Ethernets diferentes comuniquem entre si porque é um dispositivo da camada 2, armazena a frame e examina o header da frame. Tem uma tabela MAC e, por isso, pode verificar o endereço destino na frame e enviar a frame para o porto correcto sem difundir para os restantes portos. Isto depois de aprender os endereços. 
+
+[Slide 6.65]
+
+- Se a frame é destinada a um host que está no mesmo segmento de onde veio a frame, o switch faz o drop porque sabe que o nó destino já recebeu a frame.
+
+- Se a sua tabela não tem o endereço MAC destino então não sabe para onde enviar a frame. Tem de fazer um forward para todas as interfaces excepto aquela de onde veio. 
+
+[Slide 6.69]
+
+Hub: Um só domínio de colisão.
+Switch: Cada segmento um domínio de colisão. Isto é, frames para segmentos diferentes não colidem.
+Router: Quando necessitamos de subredes distintas ou acesso ao exterior (outras subredes) temos de ter um router. 
+
+Switch: divide domínios de colisao
+Router: divide domínios de broadcast. Isto é, com um switch nada impede que um host envie uma frame com destino FFFF…. (ex: DHCP) para que todos recebam e respondam. Com um router o broadcast da camada 2 não passa. O router recebe a frame, porque é dirigida a todos, mas não deixa passar para outra subrede. Aumenta também a  eficiencia dado que existem alguns protocolos que usam muito broadcast.
+Os routers isolam tráfego, controlam broadcasts e encaminham.
+
+Hubs, switches e routers são todos dispositivos de interconexão.
+
+[Slide 6.71]
+
+Terminamos aqui!
+
+
 
